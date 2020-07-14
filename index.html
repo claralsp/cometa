@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/css/bootstrap.min.css" integrity="sha384-9aIt2nRpC12Uk9gS9baDl411NQApFmC26EwAOH8WgZl5MYYxFfc+NcPb1dKGj7Sk" crossorigin="anonymous">
+  <link rel="shortcut icon" href="imgs/fav.png">
+  <title>Desviando de Estrelas</title>
+  <style>
+
+  body{
+    min-height: 100vh;
+    min-width: 100vh;
+  }
+
+  h1{
+    text-align: center;
+    font-family:'Cinzel', serif;
+    color: #fafeff;
+  }
+
+  body{
+    background-image: url(imgs/estrelas.jpg);
+  }
+
+  canvas {
+    border: 2px solid #fafeff;
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+    margin-top: auto;
+    margin-bottom: auto;
+    background-image: url(imgs/teladefundo.jpg);
+    background-size: cover;
+    background-repeat: no-repeat;
+    background-position: center;
+    overflow: hidden;
+  }
+
+  </style>
+</head>
+
+<body>
+
+  <h1>Atenção: Estrelas Cadentes</h1>
+  <canvas id="jogo" width="780" height="460"></canvas>
+
+  <script>
+  const ALTURA_JOGO = 460;
+  const LARGURA_JOGO = 780;
+
+  class Sprite {
+    constructor(x, y, largura, altura, imagem) {
+      this.x = x;
+      this.y = y;
+      this.largura = largura;
+      this.altura = altura;
+      this.imagem = imagem;
+    }
+
+    desenhe(ctx) {
+      if (this.imagem) {
+        ctx.drawImage(this.imagem, this.x, this.y, this.largura, this.altura);
+      } else
+      {
+        ctx.strokeRect(this.x, this.y, this.largura, this.altura);
+      }
+    }
+
+    get meio() {
+      return {
+        x: this.x + this.largura / 2,
+        y: this.y + this.altura / 2
+      };
+    }
+
+
+    colide(aSprite) {
+      let a = Math.abs(aSprite.meio.x - this.meio.x);
+      let b = Math.abs(aSprite.meio.y - this.meio.y);
+      let d = Math.sqrt(a ** 2 + b ** 2);
+      let r1 = this.altura / 2;
+      let r2 = aSprite.altura / 2;
+      return d <= r1 + r2;
+    }
+  }
+
+  class Cometa extends Sprite {
+    constructor() {
+      super(LARGURA_JOGO, Math.random() * (ALTURA_JOGO - 30), 50, 50, imagemCometa);
+      this.velocidadeX = -2 * Math.random() - 1;
+    }
+
+    atualize() {
+      this.x += this.velocidadeX;
+
+      if (this.x + this.largura < 0) {
+        this.x = LARGURA_JOGO;
+        this.y = Math.random() * (ALTURA_JOGO - 30);
+      }
+    }
+
+    destroi() {
+      this.x = LARGURA_JOGO;
+      this.y = Math.random() * (ALTURA_JOGO - 30);
+
+      const ding = new Audio();
+      ding.src = 'som/tiro.mp3';
+      ding.preload = 'auto';
+      ding.play();
+    }
+  }
+
+  class Tiro extends Sprite {
+    constructor(et) {
+      super(et.meio.x, et.meio.y, 25, 25, imagemTiro);
+      this.velocidadeX = 6;
+    }
+
+    atualize() {
+      this.x += this.velocidadeX;
+      if (this.x > LARGURA_JOGO) {
+        this.podeSerDestruido = true;
+      }
+    }
+  }
+
+  let canvasEl = document.querySelector('#jogo');
+  let ctx = canvasEl.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
+
+  let vidas = 3;
+  let imagemet = new Image();
+  imagemet.src = 'imgs/bonequinho.png';
+  let imagemCometa = new Image();
+  imagemCometa.src = 'imgs/estrela.gif';
+  let imagemTiro = new Image();
+  imagemTiro.src = 'imgs/bolinha.png';
+  let et = new Sprite(50, 50, 100, 100, imagemet);
+  let Cometas = [];
+  Cometas.push(new Cometa());
+  Cometas.push(new Cometa());
+  Cometas.push(new Cometa());
+  Cometas.push(new Cometa());
+  Cometas.push(new Cometa());
+  let tiros = [];
+
+  imagemet.addEventListener('load', (evento) => {
+    desenhaJogo();
+  });
+
+  canvasEl.addEventListener('mousemove', (evento) => {
+    et.x = evento.offsetX - et.largura / 2;
+    et.y = evento.offsetY - et.altura / 2;
+  });
+
+  function desenhaJogo() {
+    ctx.clearRect(0, 0, LARGURA_JOGO, ALTURA_JOGO);
+    et.desenhe(ctx);
+
+    for (let Cometa of Cometas) {
+      Cometa.desenhe(ctx);
+    }
+
+    for (let tiro of tiros) {
+      tiro.desenhe(ctx);
+    }
+    ctx.fillText(`${vidas} vida(s)`, 10, 10);
+  }
+
+  function atualizaInimigos() {
+    for (let Cometa of Cometas) {
+      Cometa.atualize();
+    }
+  }
+
+
+  function atualizaTiros() {
+    for (let tiro of tiros) {
+      tiro.atualize();
+    }
+
+    for (let i = 0; i < tiros.length; i++) {
+      if (tiros[i].podeSerDestruido) {
+        tiros.splice(i, 1);
+      }
+    }
+  }
+
+  function verificaColisoes() {
+    for (let Cometa of Cometas) {
+      const atingiuet = Cometa.colide(et);
+      if (atingiuet) {
+        Cometa.destroi();
+        vidas--;
+        if (vidas < 1) {
+          alert('Foi Atingido!!!')
+        }
+      }
+    }
+
+    for (let Cometa of Cometas) {
+      for (let tiro of tiros) {
+        const tiroAtingiuCometa = tiro.colide(Cometa);
+        if (tiroAtingiuCometa) {
+          tiro.podeSerDestruido = true;
+          Cometa.destroi();
+        }
+      }
+    }
+  }
+
+  function atualizaLogicaJogo() {
+    atualizaInimigos();
+    atualizaTiros();
+    verificaColisoes();
+    desenhaJogo();
+  }
+
+  setInterval(atualizaLogicaJogo, 33);
+
+  function darTiro() {
+    let tiro = new Tiro(et);
+    tiros.push(tiro);
+  }
+
+  document.body.addEventListener('keydown', e => {
+    if (e.key === ' ') {
+      darTiro();
+      e.preventDefault();
+    }
+  });
+
+  </script>
+</body>
+
+</html>
